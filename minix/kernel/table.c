@@ -30,6 +30,7 @@
 #define _TABLE
 
 #include "kernel/kernel.h"
+#include <minix/com.h>
 
 /* The system image table lists all programs that are part of the boot image. 
  * The order of the entries here MUST agree with the order of the programs
@@ -62,5 +63,6 @@ struct boot_image image[NR_BOOT_PROCS] = {
 {PFS_PROC_NR,   "pfs"   },
 {MFS_PROC_NR,   "mfs"   },
 {INIT_PROC_NR,  "init"  },
+{FAT32_PROC_NR, "fat32" },
 };
 

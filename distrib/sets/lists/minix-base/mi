@@ -273,6 +273,7 @@
 ./service/devman                                        minix-base
 ./service/ds                                            minix-base
 ./service/ext2                                          minix-base
+./service/fat32                                         minix-base
 ./service/hello                                         minix-base
 ./service/inet                                          minix-base      obsolete
 ./service/input                                         minix-base
@@ -388,6 +389,7 @@
 ./usr/bin/ex                                            minix-base
 ./usr/bin/expand                                        minix-base
 ./usr/bin/false                                         minix-base
+./usr/bin/fat32utils                                    minix-base
 ./usr/bin/fbdctl                                        minix-base      obsolete
 ./usr/bin/fdisk                                         minix-base
 ./usr/bin/fetch                                         minix-base

@@ -32,6 +32,7 @@
  *   0x1800 - 0x18FF	Management Information Base (MIB) requests
  *   0x1900 - 0x19FF	Socket device requests and responses
  *   0x1A00 - 0x1AFF	Network device requests and responses
+ *	 0x1B00 - 0x1B0A	FAT32 Filesystem
  *
  * Zero and negative values are widely used for OK and error responses.
  */
@@ -67,7 +68,8 @@
 #define VM_PROC_NR   ((endpoint_t) 8)   /* memory server */
 #define PFS_PROC_NR  ((endpoint_t) 9)  /* pipe filesystem */
 #define MFS_PROC_NR  ((endpoint_t) 10)  /* minix root filesystem */
-#define LAST_SPECIAL_PROC_NR	11	/* An untyped version for
+#define FAT32_PROC_NR  ((endpoint_t) 11) /*FAT32 service*/
+#define LAST_SPECIAL_PROC_NR	12	/* An untyped version for
                                            computation in macros.*/
 #define INIT_PROC_NR ((endpoint_t) LAST_SPECIAL_PROC_NR)  /* init
                                                         -- goes multiuser */
@@ -1143,6 +1145,28 @@
 #  define NDEV_LINK_UNKNOWN	0	/* link status is unknown, assume up */
 #  define NDEV_LINK_UP		1	/* link is up */
 #  define NDEV_LINK_DOWN	2	/* link is down */
+
+
+/*===========================================================================*
+ *		Messages for the FAT32 SERVER       			     *
+ *===========================================================================*/
+#define FAT32_BASE                  0x1B00
+#define FAT32_OPEN_FS               (FAT32_BASE + 1)
+#define FAT32_OPEN_ROOTDIR          (FAT32_BASE + 2)
+#define FAT32_OPEN_DIR              (FAT32_BASE + 3)
+#define FAT32_READ_FILE_BLOCK       (FAT32_BASE + 4)
+#define FAT32_READ_DIR_ENTRY        (FAT32_BASE + 5)
+#define FAT32_CLOSE_FILE            (FAT32_BASE + 6)
+#define FAT32_CLOSE_DIR             (FAT32_BASE + 7)
+#define FAT32_CLOSE_FS              (FAT32_BASE + 8)
+#define FAT32_OPEN_FILE				(FAT32_BASE + 9)
+#define FAT32_END       			(FAT32_BASE + 10)
+
+#define FAT32_ERR_NOT_FAT           -6000
+#define FAT32_ERR_INVALID_FAT       -6001
+#define FAT32_ERR_NOT_IMPLEMENTED   -6002
+#define FAT32_ERR_IO                -6003
+#define FAT32_ERR_INTERNAL          -6004
 
 /*===========================================================================*
  *		Internal codes used by several services			     *

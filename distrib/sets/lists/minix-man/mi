@@ -106,6 +106,7 @@
 ./usr/man/man1/export.1                                 minix-man       obsolete
 ./usr/man/man1/expr.1                                   minix-man
 ./usr/man/man1/false.1                                  minix-man
+./usr/man/man1/fat32utils.1                             minix-man
 ./usr/man/man1/fetch.1                                  minix-man
 ./usr/man/man1/fg.1                                     minix-man
 ./usr/man/man1/fgrep.1                                  minix-man
