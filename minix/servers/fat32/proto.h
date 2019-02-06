@@ -49,6 +49,24 @@ typedef struct fat32_request_t
 	int type;
 } fat32_request_t;
 
+
+template<typename T>
+static inline void zero(T *mem)
+{
+	ASSERT(mem!=nullptr);
+	memset(mem,0,sizeof(*mem));
+}
+
+template<typename T,size_t size>
+static inline void sized_zero(T *mem)
+{
+	ASSERT(size!=0);
+	ASSERT(mem!=nullptr);
+	memset(mem,0,size);
+}
+
+
+
 /* main.c */
 extern fat32_fs_t fs_handles[FAT32_MAX_HANDLES];
 extern int fs_handle_count;

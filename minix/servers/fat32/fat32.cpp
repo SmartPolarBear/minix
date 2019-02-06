@@ -10,9 +10,6 @@ static void fat32_date_to_tm(const fat32_date_t &date, datetime_t *t);
 static void extract_properties(const fat32_direntry_t *entry, fat32_entry_t *dest);
 static auto verify_header(fat32_header_t *header) -> bool;
 static auto verify_cluster(size_t total_clusters) -> bool;
-template<typename T>
-static inline void zero(T *mem);
-
 
 
 static void fat32_time_to_tm(const fat32_time_t &time, datetime_t *t)
@@ -45,12 +42,6 @@ static auto verify_header(fat32_header_t *header) -> bool
 static auto verify_cluster(size_t total_clusters) -> bool
 {
 	return total_clusters >= FAT32_MIN_CLUSTERS && total_clusters < FAT32_MAX_CLUSTERS;
-}
-
-template<typename T>
-static inline void zero(T *mem)
-{
-	memset(mem,0,sizeof(*mem));
 }
 
 /**

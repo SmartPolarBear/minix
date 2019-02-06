@@ -28,6 +28,8 @@ extern "C"
 #include <minix/bitmap.h>
 #include <minix/rs.h>
 
+#include <sys/errno.h>
+
 #include <stdlib.h>
 #include <string.h>
 

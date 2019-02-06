@@ -1,12 +1,10 @@
-#include <sys/errno.h>
-#include <unistd.h>
-#include <fcntl.h>
-#include "proto.h"
-#include <minix/safecopies.h>
-#include <minix/syslib.h>
-#include <string.h>
+#include "inc.h"
 #include "fat32.h"
+#include "proto.h"
+#include <fcntl.h>
 #include <unistd.h>
+#include <minix/safecopies.h>
+#include <type_traits>
 
 #define FIND_HANDLE(type, h)                      \
 	for (int i = 0; i < type##_handle_count; i++) \
@@ -16,21 +14,69 @@
 			return &type##_handles[i];            \
 		}                                         \
 	}                                             \
-	return NULL
+	return nullptr
+
+template <typename T>
+T *find_handle(int id)
+{
+	return nullptr;
+}
+
+template <>
+fat32_fs_t *find_handle(int id)
+{
+	for (int i = 0; i < fs_handle_count; i++)
+	{
+		if (fs_handles[i].nr == id)
+		{
+			return &fs_handles[i];
+		}
+	}
+	return nullptr;
+}
+
+template <>
+fat32_dir_t *find_handle(int id)
+{
+	for (int i = 0; i < dir_handle_count; i++)
+	{
+		if (dir_handles[i].nr == id)
+		{
+			return &dir_handles[i];
+		}
+	}
+	return nullptr;
+}
+
+template<>
+fat32_file_t *find_handle(int id)
+{
+	for (int i = 0; i < file_handle_count; i++)
+	{
+		if (file_handles[i].nr == id)
+		{
+			return &file_handles[i];
+		}
+	}
+	return nullptr;
+}
 
 fat32_fs_t *find_fs_handle(int h)
 {
-	FIND_HANDLE(fs, h);
+	// FIND_HANDLE(fs, h);
+	return find_handle<fat32_fs_t>(h);
 }
 
 fat32_dir_t *find_dir_handle(int h)
 {
-	FIND_HANDLE(dir, h);
+	// FIND_HANDLE(dir, h);
+	return find_handle<fat32_dir_t>(h);
 }
 
 fat32_file_t *find_file_handle(int h)
 {
-	FIND_HANDLE(file, h);
+	// FIND_HANDLE(file, h);
+	return find_handle<fat32_file_t>(h);
 }
 
 #define DESTROY_HANDLE(type, ph)                   \
@@ -56,32 +102,34 @@ int do_open_fs(const char *device, endpoint_t who)
 	CREATE_HANDLE(fs, handle);
 
 	int fd = open(device, O_RDONLY);
-	if (fd < 0)
+
+	do
 	{
-		ret = FAT32_ERR_IO;
-		goto destroy_handle;
-	}
+		if (fd < 0)
+		{
+			ret = FAT32_ERR_IO;
+			break;
+		}
 
-	if ((ret = read_fat_header(fd, &handle->header)) != OK)
-	{
-		goto close_fd;
-	}
+		if ((ret = read_fat_header(fd, &handle->header)) != OK)
+		{
+			close(fd);
+			break;
+		}
 
-	if ((ret = build_fat_info(&handle->header, &handle->info)) != OK)
-	{
-		goto close_fd;
-	}
+		if ((ret = build_fat_info(&handle->header, &handle->info)) != OK)
+		{
+			close(fd);
+			break;
+		}
 
-	handle->is_open = TRUE;
-	handle->fd = fd;
-	handle->opened_by = who;
+		handle->is_open = true;
+		handle->fd = fd;
+		handle->opened_by = who;
 
-	return handle->nr;
+		return handle->nr;
+	} while (0);
 
-close_fd:
-	close(fd);
-
-destroy_handle:
 	fs_handle_count--;
 	fs_handle_next--;
 
@@ -90,36 +138,6 @@ destroy_handle:
 
 int do_open_root_directory(fat32_fs_t *fs, endpoint_t who)
 {
-	// 	int ret = OK;
-	// 	fat32_dir_t *handle;
-	// 	CREATE_HANDLE(dir, handle);
-
-	// 	char* buf = (char*) malloc(fs->info.bytes_per_cluster);
-	// 	if (!buf) {
-	// 		ret = ENOMEM;
-	// 		goto destroy_handle;
-	// 	}
-
-	// 	int cluster_nr = fs->header.ebr.root_cluster_nr;
-	// 	if ((ret = seek_read_cluster(&fs->header, &fs->info, fs->fd, cluster_nr, buf)) != OK) {
-	// 		goto dealloc_buffer;
-	// 	}
-
-	// 	handle->fs = fs;
-	// 	handle->active_cluster = cluster_nr;
-	// 	handle->cluster_buffer_offset = 0;
-	// 	handle->cluster_buffer = buf;
-
-	// 	return handle->nr;
-
-	// dealloc_buffer:
-	// 	free(buf);
-
-	// destroy_handle:
-	// 	dir_handle_count--;
-	// 	dir_handle_next--;
-
-	// 	return ret;
 	int ret = OK;
 	fat32_dir_t *handle;
 	CREATE_HANDLE(dir, handle);
@@ -253,14 +271,18 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 	// We'll build the filename from behind, in this buffer, as we encounter the long
 	// direntries in opposite order.
 	char filename_buf[FAT32_MAX_NAME_LEN];
-	memset(filename_buf, 0, FAT32_MAX_NAME_LEN);
+
+	// memset(filename_buf, 0, FAT32_MAX_NAME_LEN);
+	// sized_zero<char,FAT32_MAX_NAME_LEN>(filename_buf);
+	sized_zero<std::remove_all_extents<decltype(filename_buf)>::type, FAT32_MAX_NAME_LEN>(filename_buf);
+
 	char *pfname = filename_buf + FAT32_MAX_NAME_LEN - 2; // Leave space for a single null terminator
 
 	int seen_long_direntry = FALSE; // Whether we've seen a single long direntry. If we have, then we
 									// should use the filenames given there. If not, we must use the
 									// 8.3 filename given in the short entry.
 
-	fat32_direntry_t *short_entry = NULL;
+	fat32_direntry_t *short_entry = nullptr;
 
 	int is_long_direntry; // Flag to control the outer loop
 
@@ -328,7 +350,10 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 			// because its bytes are scattered around the struct
 			uint16_t temp_lfn_buf[16];
 			uint16_t *pbuf = temp_lfn_buf;
-			memset(temp_lfn_buf, 0, sizeof(temp_lfn_buf));
+
+			// memset(temp_lfn_buf, 0, sizeof(temp_lfn_buf));
+			// sized_zero<uint16_t,sizeof(temp_lfn_buf)>(temp_lfn_buf);
+			sized_zero<std::remove_all_extents<decltype(temp_lfn_buf)>::type, sizeof(temp_lfn_buf)>(temp_lfn_buf);
 
 			for (int i = 0; i < 5; i++)
 			{
@@ -385,7 +410,9 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 	dir->last_entry_start_cluster = first_cluster_nr;
 	dir->last_entry_size_bytes = short_entry->size_bytes;
 
-	memset(dst, 0, sizeof(fat32_entry_t));
+	// memset(dst, 0, sizeof(fat32_entry_t));
+	zero(dst);
+
 	if (seen_long_direntry)
 	{
 		strncpy(dst->filename, pfname + 1, FAT32_MAX_NAME_LEN);
@@ -406,42 +433,6 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 
 int do_open_directory(fat32_dir_t *source, endpoint_t who)
 {
-	// 	if (!source->last_entry_was_dir || source->last_entry_start_cluster < 0) {
-	// 		return EINVAL;
-	// 	}
-
-	// 	int ret = OK;
-	// 	fat32_dir_t *handle;
-	// 	CREATE_HANDLE(dir, handle);
-
-	// 	char* buf = (char*) malloc(source->fs->info.bytes_per_cluster);
-	// 	if (!buf) {
-	// 		ret = ENOMEM;
-	// 		goto destroy_handle;
-	// 	}
-
-	// 	// do_open_directory opens the directory that was last returned from
-	// 	// do_read_dir_entry, so we use this memoized cluster number now.
-	// 	int cluster_nr = source->last_entry_start_cluster;
-	// 	if ((ret = seek_read_cluster(&source->fs->header, &source->fs->info, source->fs->fd, cluster_nr, buf)) != OK) {
-	// 		goto dealloc_buffer;
-	// 	}
-
-	// 	handle->fs = source->fs;
-	// 	handle->active_cluster = cluster_nr;
-	// 	handle->cluster_buffer_offset = 0;
-	// 	handle->cluster_buffer = buf;
-
-	// 	return handle->nr;
-
-	// dealloc_buffer:
-	// 	free(buf);
-
-	// destroy_handle:
-	// 	dir_handle_count--;
-	// 	dir_handle_next--;
-
-	// 	return ret;
 	if (!source->last_entry_was_dir || source->last_entry_start_cluster < 0)
 	{
 		return EINVAL;
