@@ -219,23 +219,16 @@ int get_next_cluster(fat32_header_t *header, fat32_info_t *info, int fd, int clu
 void convert_entry(fat32_direntry_t *entry, fat32_entry_t *dest)
 {
 	extract_properties(entry, dest);
-	// dest->is_directory = entry->attributes & static_cast<decltype(entry->attributes)>(FAT32Attributes::FAT32_ATTR_DIR);
-	// dest->is_readonly = entry->attributes & static_cast<decltype(entry->attributes)>(FAT32Attributes::FAT32_ATTR_READONLY);
-	// dest->is_hidden = entry->attributes & static_cast<decltype(entry->attributes)>(FAT32Attributes::FAT32_ATTR_HIDDEN);
-	// dest->is_system = entry->attributes & static_cast<decltype(entry->attributes)>(FAT32Attributes::FAT32_ATTR_SYSTEM);
 
 	dest->size_bytes = entry->size_bytes;
 
-	// memset(&dest->modification, 0, sizeof(dest->modification));
 	zero(&dest->modification);
 	fat32_date_to_tm(entry->last_modified_date, &dest->modification);
 	fat32_time_to_tm(entry->last_modified_time, &dest->modification);
 
-	//memset(&dest->access, 0, sizeof(dest->access));
 	zero(&dest->access);
 	fat32_date_to_tm(entry->last_access_date, &dest->access);
 
-	// memset(&dest->creation, 0, sizeof(dest->creation));
 	zero(&dest->creation);
 	fat32_date_to_tm(entry->creation_date, &dest->creation);
 	fat32_time_to_tm(entry->creation_time, &dest->creation);

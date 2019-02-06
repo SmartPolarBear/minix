@@ -6,24 +6,86 @@
 #include <minix/safecopies.h>
 #include <type_traits>
 
-#define FIND_HANDLE(type, h)                      \
-	for (int i = 0; i < type##_handle_count; i++) \
-	{                                             \
-		if (type##_handles[i].nr == h)            \
-		{                                         \
-			return &type##_handles[i];            \
-		}                                         \
-	}                                             \
-	return nullptr
+template <typename T>
+static inline void destory_handle(T *ph)
+{
+	return;
+}
+
+template <>
+inline void destory_handle(fat32_fs_t *ph)
+{
+	*ph = fs_handles[--fs_handle_count];
+}
+
+template <>
+inline void destory_handle(fat32_dir_t *ph)
+{
+	*ph = dir_handles[--dir_handle_count];
+}
+
+template <>
+inline void destory_handle(fat32_file_t *ph)
+{
+	*ph = file_handles[--file_handle_count];
+}
 
 template <typename T>
-T *find_handle(int id)
+static inline T *create_handle()
 {
 	return nullptr;
 }
 
 template <>
-fat32_fs_t *find_handle(int id)
+inline fat32_fs_t *create_handle()
+{
+	if (fs_handle_count >= FAT32_MAX_HANDLES)
+	{
+		return nullptr;
+	}
+
+	auto nr = fs_handle_next++;
+	auto ret = &fs_handles[fs_handle_count++];
+	ret->nr = nr;
+	return ret;
+}
+
+template <>
+inline fat32_dir_t *create_handle()
+{
+	if (dir_handle_count >= FAT32_MAX_HANDLES)
+	{
+		return nullptr;
+	}
+
+	auto nr = dir_handle_next++;
+	auto ret = &dir_handles[dir_handle_count++];
+	ret->nr = nr;
+	return ret;
+}
+
+template <>
+inline fat32_file_t *create_handle()
+{
+	if (file_handle_count >= FAT32_MAX_HANDLES)
+	{
+		return nullptr;
+	}
+
+	auto nr = file_handle_next++;
+	auto ret = &file_handles[file_handle_count++];
+	ret->nr = nr;
+	return ret;
+}
+
+template <typename T>
+static inline T *find_handle(int id)
+{
+	return nullptr;
+}
+
+template <>
+inline fat32_fs_t *find_handle(int id)
 {
 	for (int i = 0; i < fs_handle_count; i++)
 	{
@@ -36,7 +98,7 @@ fat32_fs_t *find_handle(int id)
 }
 
 template <>
-fat32_dir_t *find_handle(int id)
+inline fat32_dir_t *find_handle(int id)
 {
 	for (int i = 0; i < dir_handle_count; i++)
 	{
@@ -48,8 +110,8 @@ fat32_dir_t *find_handle(int id)
 	return nullptr;
 }
 
-template<>
-fat32_file_t *find_handle(int id)
+template <>
+inline fat32_file_t *find_handle(int id)
 {
 	for (int i = 0; i < file_handle_count; i++)
 	{
@@ -63,45 +125,25 @@ fat32_file_t *find_handle(int id)
 
 fat32_fs_t *find_fs_handle(int h)
 {
-	// FIND_HANDLE(fs, h);
 	return find_handle<fat32_fs_t>(h);
 }
 
 fat32_dir_t *find_dir_handle(int h)
 {
-	// FIND_HANDLE(dir, h);
 	return find_handle<fat32_dir_t>(h);
 }
 
 fat32_file_t *find_file_handle(int h)
 {
-	// FIND_HANDLE(file, h);
 	return find_handle<fat32_file_t>(h);
 }
 
-#define DESTROY_HANDLE(type, ph)                   \
-	*ph = type##_handles[type##_handle_count - 1]; \
-	type##_handle_count--;
-
-#define CREATE_HANDLE(type, handle)                      \
-	do                                                   \
-	{                                                    \
-		if (type##_handle_count >= FAT32_MAX_HANDLES)    \
-		{                                                \
-			return -1;                                   \
-		}                                                \
-		int nr = type##_handle_next++;                   \
-		handle = &type##_handles[type##_handle_count++]; \
-		handle->nr = nr;                                 \
-	} while (0)
-
 int do_open_fs(const char *device, endpoint_t who)
 {
-	int ret = OK;
-	fat32_fs_t *handle;
-	CREATE_HANDLE(fs, handle);
+	auto ret = OK;
+	fat32_fs_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
 
-	int fd = open(device, O_RDONLY);
+	auto fd = open(device, O_RDONLY);
 
 	do
 	{
@@ -138,24 +180,21 @@ int do_open_fs(const char *device, endpoint_t who)
 
 int do_open_root_directory(fat32_fs_t *fs, endpoint_t who)
 {
-	int ret = OK;
-	fat32_dir_t *handle;
-	CREATE_HANDLE(dir, handle);
+	auto ret = OK;
+	fat32_dir_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
 
 	do
 	{
-		char *buf = (char *)malloc(fs->info.bytes_per_cluster);
+		auto buf = reinterpret_cast<char *>(malloc(fs->info.bytes_per_cluster));
 		if (!buf)
 		{
 			ret = ENOMEM;
-			// goto destroy_handle;
 			break;
 		}
 
 		int cluster_nr = fs->header.ebr.root_cluster_nr;
 		if ((ret = seek_read_cluster(&fs->header, &fs->info, fs->fd, cluster_nr, buf)) != OK)
 		{
-			// goto dealloc_buffer;
 			free(buf);
 			break;
 		}
@@ -176,7 +215,7 @@ int do_open_root_directory(fat32_fs_t *fs, endpoint_t who)
 
 int advance_dir_cluster(fat32_dir_t *dir)
 {
-	int ret, next_cluster_nr;
+	auto ret = 0, next_cluster_nr = 0;
 	if ((ret = get_next_cluster(&dir->fs->header, &dir->fs->info, dir->fs->fd,
 								dir->active_cluster, &next_cluster_nr)) != OK)
 	{
@@ -207,7 +246,7 @@ int advance_dir_cluster(fat32_dir_t *dir)
 
 int advance_file_cluster(fat32_file_t *file)
 {
-	int ret, next_cluster_nr;
+	auto ret = 0, next_cluster_nr = 0;
 	if ((ret = get_next_cluster(&file->fs->header, &file->fs->info, file->fs->fd,
 								file->active_cluster, &next_cluster_nr)) != OK)
 	{
@@ -224,7 +263,7 @@ void filename_83_to_string(char *filename_83, char *dest)
 	strncpy(dest, filename_83, 8);
 
 	// Find the first space in the filename and put a dot after it.
-	int first_space;
+	auto first_space = 0;
 	for (first_space = 0;
 		 first_space < 8 && filename_83[first_space] != ' ';
 		 first_space++)
@@ -237,7 +276,7 @@ void filename_83_to_string(char *filename_83, char *dest)
 
 	// Find the first space in the extension and put a null terminator after
 	// it.
-	int dot_position = first_space;
+	auto dot_position = first_space;
 	for (first_space = 8;
 		 first_space < 11 && filename_83[first_space] != ' ';
 		 first_space++)
@@ -258,9 +297,9 @@ void filename_83_to_string(char *filename_83, char *dest)
 int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 					  endpoint_t who)
 {
-	*was_written = FALSE;
+	*was_written = false;
 	dir->last_entry_start_cluster = -1;
-	dir->last_entry_was_dir = FALSE;
+	dir->last_entry_was_dir = false;
 
 	if (dir->cluster_buffer_offset == -1)
 	{
@@ -270,27 +309,25 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 
 	// We'll build the filename from behind, in this buffer, as we encounter the long
 	// direntries in opposite order.
-	char filename_buf[FAT32_MAX_NAME_LEN];
+	char filename_buf[FAT32_MAX_NAME_LEN] = {0};
 
-	// memset(filename_buf, 0, FAT32_MAX_NAME_LEN);
-	// sized_zero<char,FAT32_MAX_NAME_LEN>(filename_buf);
 	sized_zero<std::remove_all_extents<decltype(filename_buf)>::type, FAT32_MAX_NAME_LEN>(filename_buf);
 
 	char *pfname = filename_buf + FAT32_MAX_NAME_LEN - 2; // Leave space for a single null terminator
 
-	int seen_long_direntry = FALSE; // Whether we've seen a single long direntry. If we have, then we
+	int seen_long_direntry = false; // Whether we've seen a single long direntry. If we have, then we
 									// should use the filenames given there. If not, we must use the
 									// 8.3 filename given in the short entry.
 
 	fat32_direntry_t *short_entry = nullptr;
 
-	int is_long_direntry; // Flag to control the outer loop
+	int is_long_direntry = false; // Flag to control the outer loop
 
 	// Loop until we get to the short direntry corresponding to long direntries
 	// that we might encounter
 	do
 	{
-		is_long_direntry = FALSE;
+		is_long_direntry = false;
 
 		// If we've reached the end, we must get to the next clustah
 		if (dir->cluster_buffer_offset + 32 > dir->fs->info.bytes_per_cluster)
@@ -338,8 +375,8 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 		{
 			// 0x0F as attributes field means this is a long direntry.
 
-			is_long_direntry = TRUE;
-			seen_long_direntry = TRUE;
+			is_long_direntry = true;
+			seen_long_direntry = true;
 
 			if (pfname < filename_buf)
 			{ // Truncated filename in a previous direntry?
@@ -349,10 +386,8 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 			// Copy the filename into a temporary buffer for easier handling
 			// because its bytes are scattered around the struct
 			uint16_t temp_lfn_buf[16];
-			uint16_t *pbuf = temp_lfn_buf;
+			auto pbuf = temp_lfn_buf;
 
-			// memset(temp_lfn_buf, 0, sizeof(temp_lfn_buf));
-			// sized_zero<uint16_t,sizeof(temp_lfn_buf)>(temp_lfn_buf);
 			sized_zero<std::remove_all_extents<decltype(temp_lfn_buf)>::type, sizeof(temp_lfn_buf)>(temp_lfn_buf);
 
 			for (int i = 0; i < 5; i++)
@@ -372,7 +407,7 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 			// null terminator (i.e. its length fills the direntry char fields
 			// completely), we have a bit of leeway inside the buffer and we
 			// memset'd it to zero, so we're guaranteed to get to it.
-			int len = 0;
+			auto len = 0;
 			for (uint16_t *len_pbuf = temp_lfn_buf; *len_pbuf; len_pbuf++)
 			{
 				len++;
@@ -396,11 +431,6 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 		}
 	} while (is_long_direntry);
 
-	// if (short_entry->attributes & static_cast<decltype(short_entry->attributes)>(FAT32Attributes::FAT32_ATTR_DIR))
-	// {
-	// dir->last_entry_was_dir = TRUE;
-	// }
-
 	dir->last_entry_was_dir = has_attribute(short_entry->attributes, FAT32Attributes::FAT32_ATTR_DIR);
 
 	int first_cluster_nr = direntry_full_addr(short_entry);
@@ -410,7 +440,6 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 	dir->last_entry_start_cluster = first_cluster_nr;
 	dir->last_entry_size_bytes = short_entry->size_bytes;
 
-	// memset(dst, 0, sizeof(fat32_entry_t));
 	zero(dst);
 
 	if (seen_long_direntry)
@@ -426,7 +455,7 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 	convert_entry(short_entry, dst);
 
 	FAT_LOG_PRINTF(debug, "Read %s '%s'", dst->is_directory ? "dir" : "file", dst->filename);
-	*was_written = TRUE;
+	*was_written = true;
 
 	return OK;
 }
@@ -438,13 +467,12 @@ int do_open_directory(fat32_dir_t *source, endpoint_t who)
 		return EINVAL;
 	}
 
-	int ret = OK;
-	fat32_dir_t *handle;
-	CREATE_HANDLE(dir, handle);
+	auto ret = OK;
+	fat32_dir_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
 
 	do
 	{
-		char *buf = (char *)malloc(source->fs->info.bytes_per_cluster);
+		auto buf = reinterpret_cast<char *>(malloc(source->fs->info.bytes_per_cluster));
 		if (!buf)
 		{
 			ret = ENOMEM;
@@ -454,10 +482,9 @@ int do_open_directory(fat32_dir_t *source, endpoint_t who)
 
 		// do_open_directory opens the directory that was last returned from
 		// do_read_dir_entry, so we use this memoized cluster number now.
-		int cluster_nr = source->last_entry_start_cluster;
+		auto cluster_nr = source->last_entry_start_cluster;
 		if ((ret = seek_read_cluster(&source->fs->header, &source->fs->info, source->fs->fd, cluster_nr, buf)) != OK)
 		{
-			// goto dealloc_buffer;
 			free(buf);
 			break;
 		}
@@ -483,8 +510,7 @@ int do_open_file(fat32_dir_t *source, endpoint_t who)
 		return EINVAL;
 	}
 
-	fat32_file_t *handle;
-	CREATE_HANDLE(file, handle);
+	fat32_file_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
 
 	handle->fs = source->fs;
 	handle->active_cluster = source->last_entry_start_cluster;
@@ -510,7 +536,7 @@ int do_read_file_block(fat32_file_t *file, char *buffer, int *len, endpoint_t wh
 		return OK;
 	}
 
-	int ret;
+	auto ret = 0;
 	if ((ret = seek_read_cluster(&file->fs->header, &file->fs->info, file->fs->fd, file->active_cluster, buffer)) != OK)
 	{
 		return ret;
@@ -549,7 +575,7 @@ int do_read_file_block(fat32_file_t *file, char *buffer, int *len, endpoint_t wh
 
 int do_close_file(fat32_file_t *file, endpoint_t who)
 {
-	DESTROY_HANDLE(file, file);
+	destory_handle(file);
 	FAT_LOG_PRINTF(debug, "destroying file %d", file->nr);
 	for (int i = 0; i < file_handle_count; i++)
 	{
@@ -562,15 +588,13 @@ int do_close_file(fat32_file_t *file, endpoint_t who)
 int do_close_directory(fat32_dir_t *dir, endpoint_t who)
 {
 	free(dir->cluster_buffer);
-	DESTROY_HANDLE(dir, dir);
-
+	destory_handle(dir);
 	return OK;
 }
 
 int do_close_fs(fat32_fs_t *fs, endpoint_t who)
 {
 	close(fs->fd);
-	DESTROY_HANDLE(fs, fs);
-
+	destory_handle(fs);
 	return OK;
 }
