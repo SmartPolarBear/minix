@@ -1,6 +1,7 @@
 #include "inc.h"
 #include "avl.h"
 #include <minix/endpoint.h>
+constexpr int Reversion=1;
 
 fat32_fs_t fs_handles[FAT32_MAX_HANDLES];
 int fs_handle_count;
@@ -26,7 +27,7 @@ int main(int argc, char **argv)
 	env_setargs(argc, argv);
 	sef_local_startup();
 
-	printf("Load the FAT32 filesystem service.\n");
+	printf("Load the FAT32 filesystem service (Ver.%d).\n",Reversion);
 
 	fs_tree = avl_create();
 	dir_tree = avl_create();
