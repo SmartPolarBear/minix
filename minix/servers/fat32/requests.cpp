@@ -1,4 +1,5 @@
 #include "inc.h"
+#include "avl.h"
 #include "fat32.h"
 #include "proto.h"
 #include <fcntl.h>
@@ -6,12 +7,27 @@
 #include <minix/safecopies.h>
 #include <type_traits>
 
+
+/*Template prototypes for handle helpers*/
+template <typename T>
+static inline T *create_handle()
+{
+	return nullptr;
+}
+
+template <typename T>
+static inline T *find_handle(int id)
+{
+	return nullptr;
+}
+
 template <typename T>
 static inline void destory_handle(T *ph)
 {
 	return;
 }
 
+/*Specializations for destory_handle*/
 template <>
 inline void destory_handle(fat32_fs_t *ph)
 {
@@ -30,12 +46,7 @@ inline void destory_handle(fat32_file_t *ph)
 	*ph = file_handles[--file_handle_count];
 }
 
-template <typename T>
-static inline T *create_handle()
-{
-	return nullptr;
-}
-
+/*Specializations for create_handle*/
 template <>
 inline fat32_fs_t *create_handle()
 {
@@ -78,12 +89,7 @@ inline fat32_file_t *create_handle()
 	return ret;
 }
 
-template <typename T>
-static inline T *find_handle(int id)
-{
-	return nullptr;
-}
-
+/*Specializations for find_handle*/
 template <>
 inline fat32_fs_t *find_handle(int id)
 {
@@ -123,21 +129,83 @@ inline fat32_file_t *find_handle(int id)
 	return nullptr;
 }
 
+static void filename_83_to_string(char *filename_83, char *dest)
+{
+	// Copy the filename portion to the new string.
+	strncpy(dest, filename_83, 8);
+
+	// Find the first space in the filename and put a dot after it.
+	auto first_space = 0;
+	for (first_space = 0;
+		 first_space < 8 && filename_83[first_space] != ' ';
+		 first_space++)
+		;
+
+	dest[first_space] = '.';
+
+	// Copy the extension right after the dot.
+	strncpy(dest + first_space + 1, filename_83 + 8, 3);
+
+	// Find the first space in the extension and put a null terminator after
+	// it.
+	auto dot_position = first_space;
+	for (first_space = 8;
+		 first_space < 11 && filename_83[first_space] != ' ';
+		 first_space++)
+		;
+
+	// If there's no extension, don't put the dot, just overwrite it with
+	// a null terminator.
+	if (first_space == 8)
+	{
+		dest[dot_position] = '\0';
+	}
+	else
+	{
+		dest[dot_position + first_space - 8 + 1] = '\0';
+	}
+}
+
+/**
+ * @brief Find filesystem handle
+ * 
+ * @param h handle nr
+ * @return fat32_fs_t* 
+ */
 fat32_fs_t *find_fs_handle(int h)
 {
 	return find_handle<fat32_fs_t>(h);
 }
 
+/**
+ * @brief Find directory handle
+ * 
+ * @param h handle nr
+ * @return fat32_dir_t* 
+ */
 fat32_dir_t *find_dir_handle(int h)
 {
 	return find_handle<fat32_dir_t>(h);
 }
 
+/**
+ * @brief Find file handle
+ * 
+ * @param h handle nr
+ * @return fat32_file_t* 
+ */
 fat32_file_t *find_file_handle(int h)
 {
 	return find_handle<fat32_file_t>(h);
 }
 
+/**
+ * @brief Opens a FAT32 filesystem. 
+ * 
+ * @param device 
+ * @param who 
+ * @return int 
+ */
 int do_open_fs(const char *device, endpoint_t who)
 {
 	auto ret = OK;
@@ -178,6 +246,13 @@ int do_open_fs(const char *device, endpoint_t who)
 	return ret;
 }
 
+/**
+ * @brief Opens the root directory of the filesystem for listing.
+ * 
+ * @param fs 
+ * @param who 
+ * @return int 
+ */
 int do_open_root_directory(fat32_fs_t *fs, endpoint_t who)
 {
 	auto ret = OK;
@@ -213,6 +288,14 @@ int do_open_root_directory(fat32_fs_t *fs, endpoint_t who)
 	return ret;
 }
 
+/**
+ * @brief Advances the given directory handle one cluster forward in the cluster chain,
+ * by setting its active_cluster. It also reads the cluster contents into the
+ * directory's cluster buffer.
+ * 
+ * @param dir 
+ * @return int 
+ */
 int advance_dir_cluster(fat32_dir_t *dir)
 {
 	auto ret = 0, next_cluster_nr = 0;
@@ -244,6 +327,13 @@ int advance_dir_cluster(fat32_dir_t *dir)
 	return OK;
 }
 
+/**
+ * @brief Advances the given file handle one cluster forward in the cluster chain,
+ * likewise.
+ * 
+ * @param file 
+ * @return int 
+ */
 int advance_file_cluster(fat32_file_t *file)
 {
 	auto ret = 0, next_cluster_nr = 0;
@@ -257,43 +347,18 @@ int advance_file_cluster(fat32_file_t *file)
 	return OK;
 }
 
-void filename_83_to_string(char *filename_83, char *dest)
-{
-	// Copy the filename portion to the new string.
-	strncpy(dest, filename_83, 8);
-
-	// Find the first space in the filename and put a dot after it.
-	auto first_space = 0;
-	for (first_space = 0;
-		 first_space < 8 && filename_83[first_space] != ' ';
-		 first_space++)
-		;
-
-	dest[first_space] = '.';
-
-	// Copy the extension right after the dot.
-	strncpy(dest + first_space + 1, filename_83 + 8, 3);
-
-	// Find the first space in the extension and put a null terminator after
-	// it.
-	auto dot_position = first_space;
-	for (first_space = 8;
-		 first_space < 11 && filename_83[first_space] != ' ';
-		 first_space++)
-		;
-
-	// If there's no extension, don't put the dot, just overwrite it with
-	// a null terminator.
-	if (first_space == 8)
-	{
-		dest[dot_position] = '\0';
-	}
-	else
-	{
-		dest[dot_position + first_space - 8 + 1] = '\0';
-	}
-}
-
+/**
+ * @brief Reads the next directory entry for this directory. Writes TRUE to *was_written
+ * if anything was written to *dst, and FALSE otherwise. The caller may assume
+ * that when the call succeeds with *was_written == FALSE, there are no more
+ * directory entries in the given directory.
+ * 
+ * @param dir 
+ * @param dst 
+ * @param was_written 
+ * @param who 
+ * @return int 
+ */
 int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 					  endpoint_t who)
 {
@@ -303,7 +368,7 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 
 	if (dir->cluster_buffer_offset == -1)
 	{
-		// Thhe whole dir was read during a previous call.
+		// The whole dir was read during a previous call.
 		return OK;
 	}
 
@@ -460,6 +525,14 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 	return OK;
 }
 
+/**
+ * @brief Opens the item that was last returned by do_read_dir_entry for a given
+ * parent directory, if that item is a directory.
+ * 
+ * @param source 
+ * @param who 
+ * @return int 
+ */
 int do_open_directory(fat32_dir_t *source, endpoint_t who)
 {
 	if (!source->last_entry_was_dir || source->last_entry_start_cluster < 0)
@@ -476,7 +549,6 @@ int do_open_directory(fat32_dir_t *source, endpoint_t who)
 		if (!buf)
 		{
 			ret = ENOMEM;
-			// goto destroy_handle;
 			break;
 		}
 
@@ -503,6 +575,14 @@ int do_open_directory(fat32_dir_t *source, endpoint_t who)
 	return ret;
 }
 
+/**
+ * @brief Opens the item that was last returned by do_read_dir_entry for a given
+ * parent directory, if that item is a file. 
+ * 
+ * @param source 
+ * @param who 
+ * @return int 
+ */
 int do_open_file(fat32_dir_t *source, endpoint_t who)
 {
 	if (source->last_entry_was_dir || source->last_entry_start_cluster < 0)
@@ -519,6 +599,16 @@ int do_open_file(fat32_dir_t *source, endpoint_t who)
 	return handle->nr;
 }
 
+/**
+ * @brief Reads the next block of a file. The buffer must be at least
+ * file->fs->info.bytes_per_cluster bytes long.
+ * 
+ * @param file 
+ * @param buffer 
+ * @param len 
+ * @param who 
+ * @return int 
+ */
 int do_read_file_block(fat32_file_t *file, char *buffer, int *len, endpoint_t who)
 {
 	if (*len < file->fs->info.bytes_per_cluster)
@@ -573,6 +663,13 @@ int do_read_file_block(fat32_file_t *file, char *buffer, int *len, endpoint_t wh
 	return OK;
 }
 
+/**
+ * @brief Closes a previously open file handle. 
+ * 
+ * @param file 
+ * @param who 
+ * @return int 
+ */
 int do_close_file(fat32_file_t *file, endpoint_t who)
 {
 	destory_handle(file);
@@ -585,6 +682,13 @@ int do_close_file(fat32_file_t *file, endpoint_t who)
 	return OK;
 }
 
+/**
+ * @brief Closes a previously open directory handle.
+ * 
+ * @param dir 
+ * @param who 
+ * @return int 
+ */
 int do_close_directory(fat32_dir_t *dir, endpoint_t who)
 {
 	free(dir->cluster_buffer);
@@ -592,6 +696,14 @@ int do_close_directory(fat32_dir_t *dir, endpoint_t who)
 	return OK;
 }
 
+/**
+ * @brief Closes a previously open FAT32 filesystem handle. This closes the block device
+ * backing the handle.
+ * 
+ * @param fs 
+ * @param who 
+ * @return int 
+ */
 int do_close_fs(fat32_fs_t *fs, endpoint_t who)
 {
 	close(fs->fd);

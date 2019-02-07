@@ -1,4 +1,5 @@
 #include "inc.h"
+#include "avl.h"
 #include <minix/endpoint.h>
 
 fat32_fs_t fs_handles[FAT32_MAX_HANDLES];
@@ -13,18 +14,25 @@ fat32_file_t file_handles[FAT32_MAX_HANDLES];
 int file_handle_count;
 int file_handle_next;
 
+avl_tree_t *fs_tree = nullptr;
+avl_tree_t *dir_tree = nullptr;
+avl_tree_t *file_tree = nullptr;
+
 /* SEF functions and variables. */
 void sef_local_startup(void);
-
 
 int main(int argc, char **argv)
 {
 	env_setargs(argc, argv);
 	sef_local_startup();
 
+	fs_tree = avl_create();
+	dir_tree = avl_create();
+	file_tree = avl_create();
+
 	printf("Load the FAT32 filesystem service.\n");
 
-	for(;;)
+	for (;;)
 	{
 		fat32_entry_t entry;
 		fat32_fs_t *fs;
@@ -37,7 +45,6 @@ int main(int argc, char **argv)
 		int local_len;
 		message m;
 		int result;
-		
 
 		if (wait_request(&m, &req) != OK)
 		{
@@ -47,7 +54,7 @@ int main(int argc, char **argv)
 			switch (req.type)
 			{
 			case FAT32_OPEN_FS:
-				result = do_open_fs(reinterpret_cast<const char*>(m.m_fat32_open_fs.device), m.m_source);
+				result = do_open_fs(reinterpret_cast<const char *>(m.m_fat32_open_fs.device), m.m_source);
 				if (result >= 0)
 				{
 					m.m_fat32_io_handle.handle = result;
@@ -185,7 +192,7 @@ int main(int argc, char **argv)
 
 				// Allocating a new buffer every time is criminally wasteful of
 				// resources. This should be fixed one day.
-				if ((local_buf = reinterpret_cast<char*>(malloc(file->fs->info.bytes_per_cluster))) == NULL)
+				if ((local_buf = reinterpret_cast<char *>(malloc(file->fs->info.bytes_per_cluster))) == NULL)
 				{
 					result = ENOMEM;
 					break;
@@ -272,6 +279,10 @@ int main(int argc, char **argv)
 		}
 	}
 
+	avl_destroy(fs_tree);
+	avl_destroy(dir_tree);
+	avl_destroy(file_tree);
+
 	return OK;
 }
 
@@ -304,16 +315,15 @@ void reply(endpoint_t destination, message *msg)
 	}
 }
 
-int sef_cb_init(int type,sef_init_info_t *info)
+int sef_cb_init(int type, sef_init_info_t *info)
 {
-    return (OK);
+	return (OK);
 }
-
 
 void sef_local_startup()
 {
-    sef_setcb_init_fresh(sef_cb_init);
-    sef_setcb_init_restart(sef_cb_init);
+	sef_setcb_init_fresh(sef_cb_init);
+	sef_setcb_init_restart(sef_cb_init);
 
 	/* Let SEF perform startup. */
 	sef_startup();
