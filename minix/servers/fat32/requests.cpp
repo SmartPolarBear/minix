@@ -7,7 +7,6 @@
 #include <minix/safecopies.h>
 #include <type_traits>
 
-
 /*Template prototypes for handle helpers*/
 template <typename T>
 static inline T *create_handle()
@@ -31,18 +30,24 @@ static inline void destory_handle(T *ph)
 template <>
 inline void destory_handle(fat32_fs_t *ph)
 {
+	avl_delete(fs_tree, ph->nr);
+
 	*ph = fs_handles[--fs_handle_count];
 }
 
 template <>
 inline void destory_handle(fat32_dir_t *ph)
 {
+	avl_delete(dir_tree, ph->nr);
+
 	*ph = dir_handles[--dir_handle_count];
 }
 
 template <>
 inline void destory_handle(fat32_file_t *ph)
 {
+	avl_delete(file_tree, ph->nr);
+
 	*ph = file_handles[--file_handle_count];
 }
 
@@ -58,6 +63,9 @@ inline fat32_fs_t *create_handle()
 	auto nr = fs_handle_next++;
 	auto ret = &fs_handles[fs_handle_count++];
 	ret->nr = nr;
+
+	avl_insert(fs_tree, nr, ret);
+
 	return ret;
 }
 
@@ -72,6 +80,9 @@ inline fat32_dir_t *create_handle()
 	auto nr = dir_handle_next++;
 	auto ret = &dir_handles[dir_handle_count++];
 	ret->nr = nr;
+
+	avl_insert(dir_tree, nr, ret);
+
 	return ret;
 }
 
@@ -86,6 +97,9 @@ inline fat32_file_t *create_handle()
 	auto nr = file_handle_next++;
 	auto ret = &file_handles[file_handle_count++];
 	ret->nr = nr;
+
+	avl_insert(file_tree, nr, ret);
+
 	return ret;
 }
 
@@ -93,38 +107,61 @@ inline fat32_file_t *create_handle()
 template <>
 inline fat32_fs_t *find_handle(int id)
 {
-	for (int i = 0; i < fs_handle_count; i++)
+	// for (int i = 0; i < fs_handle_count; i++)
+	// {
+	// if (fs_handles[i].nr == id)
+	// {
+	// return &fs_handles[i];
+	// }
+	// }
+	auto val = avl_lookup(fs_tree, id);
+	if (val)
 	{
-		if (fs_handles[i].nr == id)
-		{
-			return &fs_handles[i];
-		}
+		fat32_fs_t *ret = *reinterpret_cast<fat32_fs_t **>(val);
+		ASSERT(ret->nr == id);
+		return ret;
 	}
+
 	return nullptr;
 }
 
 template <>
 inline fat32_dir_t *find_handle(int id)
 {
-	for (int i = 0; i < dir_handle_count; i++)
+	// for (int i = 0; i < dir_handle_count; i++)
+	// {
+		// if (dir_handles[i].nr == id)
+		// {
+			// return &dir_handles[i];
+		// }
+	// }
+	auto val = avl_lookup(dir_tree, id);
+	if (val)
 	{
-		if (dir_handles[i].nr == id)
-		{
-			return &dir_handles[i];
-		}
+		fat32_dir_t *ret = *reinterpret_cast<fat32_dir_t **>(val);
+		ASSERT(ret->nr == id);
+		return ret;
 	}
+
 	return nullptr;
 }
 
 template <>
 inline fat32_file_t *find_handle(int id)
 {
-	for (int i = 0; i < file_handle_count; i++)
+	// for (int i = 0; i < file_handle_count; i++)
+	// {
+		// if (file_handles[i].nr == id)
+		// {
+			// return &file_handles[i];
+		// }
+	// }
+	auto val = avl_lookup(file_tree, id);
+	if (val)
 	{
-		if (file_handles[i].nr == id)
-		{
-			return &file_handles[i];
-		}
+		fat32_file_t *ret = *reinterpret_cast<fat32_file_t **>(val);
+		ASSERT(ret->nr == id);
+		return ret;
 	}
 	return nullptr;
 }

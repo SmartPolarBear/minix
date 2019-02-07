@@ -26,11 +26,13 @@ int main(int argc, char **argv)
 	env_setargs(argc, argv);
 	sef_local_startup();
 
+	printf("Load the FAT32 filesystem service.\n");
+
 	fs_tree = avl_create();
 	dir_tree = avl_create();
 	file_tree = avl_create();
 
-	printf("Load the FAT32 filesystem service.\n");
+	printf("FAT32: create tables.\n");
 
 	for (;;)
 	{

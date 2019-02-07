@@ -1,6 +1,7 @@
 #ifndef MINIX_SERVERS_FAT32_PROTO_H_
 #define MINIX_SERVERS_FAT32_PROTO_H_
 
+
 #ifdef __cplusplus
 extern "C"
 {
@@ -19,6 +20,7 @@ extern "C"
 #endif
 
 #include "fat32.h"
+#include "avl.h"
 
 
 #define FAT_LOG_PRINTF(level, fmt, ...)                       \
@@ -79,6 +81,10 @@ extern int dir_handle_next;
 extern fat32_file_t file_handles[FAT32_MAX_HANDLES];
 extern int file_handle_count;
 extern int file_handle_next;
+
+extern avl_tree_t *fs_tree;
+extern avl_tree_t *dir_tree;
+extern avl_tree_t *file_tree;
 
 int main(int argc, char **argv);
 void reply(endpoint_t destination, message *msg);
