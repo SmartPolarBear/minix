@@ -107,13 +107,6 @@ inline fat32_file_t *create_handle()
 template <>
 inline fat32_fs_t *find_handle(int id)
 {
-	// for (int i = 0; i < fs_handle_count; i++)
-	// {
-	// if (fs_handles[i].nr == id)
-	// {
-	// return &fs_handles[i];
-	// }
-	// }
 	auto val = avl_lookup(fs_tree, id);
 	if (val)
 	{
@@ -128,13 +121,6 @@ inline fat32_fs_t *find_handle(int id)
 template <>
 inline fat32_dir_t *find_handle(int id)
 {
-	// for (int i = 0; i < dir_handle_count; i++)
-	// {
-		// if (dir_handles[i].nr == id)
-		// {
-			// return &dir_handles[i];
-		// }
-	// }
 	auto val = avl_lookup(dir_tree, id);
 	if (val)
 	{
@@ -149,13 +135,6 @@ inline fat32_dir_t *find_handle(int id)
 template <>
 inline fat32_file_t *find_handle(int id)
 {
-	// for (int i = 0; i < file_handle_count; i++)
-	// {
-		// if (file_handles[i].nr == id)
-		// {
-			// return &file_handles[i];
-		// }
-	// }
 	auto val = avl_lookup(file_tree, id);
 	if (val)
 	{
@@ -246,7 +225,7 @@ fat32_file_t *find_file_handle(int h)
 int do_open_fs(const char *device, endpoint_t who)
 {
 	auto ret = OK;
-	fat32_fs_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
+	fat32_fs_t *handle = create_handle<std::remove_pointer_t<decltype(handle)>>();
 
 	auto fd = open(device, O_RDONLY);
 
@@ -293,7 +272,7 @@ int do_open_fs(const char *device, endpoint_t who)
 int do_open_root_directory(fat32_fs_t *fs, endpoint_t who)
 {
 	auto ret = OK;
-	fat32_dir_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
+	fat32_dir_t *handle = create_handle<std::remove_pointer_t<decltype(handle)>>();
 
 	do
 	{
@@ -413,7 +392,7 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 	// direntries in opposite order.
 	char filename_buf[FAT32_MAX_NAME_LEN] = {0};
 
-	sized_zero<std::remove_all_extents<decltype(filename_buf)>::type, FAT32_MAX_NAME_LEN>(filename_buf);
+	sized_zero<std::remove_all_extents_t<decltype(filename_buf)>, FAT32_MAX_NAME_LEN>(filename_buf);
 
 	char *pfname = filename_buf + FAT32_MAX_NAME_LEN - 2; // Leave space for a single null terminator
 
@@ -449,8 +428,8 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 		}
 
 		// Choo choo! Violating strict aliasing rules. Compiler may decide to murder cat.
-		fat32_any_direntry_t *direntry =
-			(fat32_any_direntry_t *)&dir->cluster_buffer[dir->cluster_buffer_offset];
+		auto direntry =
+			reinterpret_cast<fat32_any_direntry_t *>(&dir->cluster_buffer[dir->cluster_buffer_offset]);
 		dir->cluster_buffer_offset += 32;
 
 		if (direntry->short_entry.filename_83[0] == '\0')
@@ -490,7 +469,7 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 			uint16_t temp_lfn_buf[16];
 			auto pbuf = temp_lfn_buf;
 
-			sized_zero<std::remove_all_extents<decltype(temp_lfn_buf)>::type, sizeof(temp_lfn_buf)>(temp_lfn_buf);
+			sized_zero<std::remove_all_extents_t<decltype(temp_lfn_buf)>, sizeof(temp_lfn_buf)>(temp_lfn_buf);
 
 			for (int i = 0; i < 5; i++)
 			{
@@ -529,7 +508,7 @@ int do_read_dir_entry(fat32_dir_t *dir, fat32_entry_t *dst, int *was_written,
 		}
 		else
 		{
-			short_entry = (fat32_direntry_t *)direntry;
+			short_entry = reinterpret_cast<fat32_direntry_t *>(direntry);
 		}
 	} while (is_long_direntry);
 
@@ -578,7 +557,7 @@ int do_open_directory(fat32_dir_t *source, endpoint_t who)
 	}
 
 	auto ret = OK;
-	fat32_dir_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
+	fat32_dir_t *handle = create_handle<std::remove_pointer_t<decltype(handle)>>();
 
 	do
 	{
@@ -627,7 +606,7 @@ int do_open_file(fat32_dir_t *source, endpoint_t who)
 		return EINVAL;
 	}
 
-	fat32_file_t *handle = create_handle<std::remove_pointer<decltype(handle)>::type>();
+	fat32_file_t *handle = create_handle<std::remove_pointer_t<decltype(handle)>>();
 
 	handle->fs = source->fs;
 	handle->active_cluster = source->last_entry_start_cluster;

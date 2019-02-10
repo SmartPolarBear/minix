@@ -41,7 +41,8 @@ static auto verify_header(fat32_header_t *header) -> bool
 
 static auto verify_cluster(size_t total_clusters) -> bool
 {
-	return total_clusters >= FAT32_MIN_CLUSTERS && total_clusters < FAT32_MAX_CLUSTERS;
+	// return total_clusters >= FAT32_MIN_CLUSTERS && total_clusters < FAT32_MAX_CLUSTERS;
+	return between_const<FAT32_MIN_CLUSTERS,FAT32_MAX_CLUSTERS,false,true>(total_clusters);
 }
 
 /**

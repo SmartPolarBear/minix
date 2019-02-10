@@ -1,7 +1,7 @@
 #ifndef MINIX_SERVERS_FAT32_PROTO_H_
 #define MINIX_SERVERS_FAT32_PROTO_H_
 
-
+#include "utils.hpp"
 #ifdef __cplusplus
 extern "C"
 {
@@ -21,7 +21,7 @@ extern "C"
 
 #include "fat32.h"
 #include "avl.h"
-
+#include <type_traits>
 
 #define FAT_LOG_PRINTF(level, fmt, ...)                       \
 	do                                                        \
@@ -51,21 +51,6 @@ typedef struct fat32_request_t
 	int type;
 } fat32_request_t;
 
-
-template<typename T>
-static inline void zero(T *mem)
-{
-	ASSERT(mem!=nullptr);
-	memset(mem,0,sizeof(*mem));
-}
-
-template<typename T,size_t size>
-static inline void sized_zero(T *mem)
-{
-	ASSERT(size!=0);
-	ASSERT(mem!=nullptr);
-	memset(mem,0,size);
-}
 
 
 
